@@ -1,0 +1,7 @@
+*.log
+*.bak
+*.tmp
+*.swp
+*.swo
+*.retry
+config.env
