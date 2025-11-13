@@ -578,6 +578,8 @@ install_checa_dns_script() {
 # Script de teste de recursividade do Unbound + failover OSPF
 # BY: LAILSON ARAUJO — Contato: +55 83 98615-2503
 
+ENABLE_TELEGRAM=${ENABLE_TELEGRAM:-0}
+
 dominios_testar=(
 www.google.com
 www.terra.com.br
@@ -601,7 +603,9 @@ remove_ospf() {
       vtysh -c 'conf t' -c 'interface lo' -c 'no ip ospf passive' -c 'end' -c 'wr'
       vtysh -c 'conf t' -c 'interface lo' -c 'no ipv6 ospf6 area 0.0.0.0' -c 'end' -c 'wr'
       vtysh -c 'conf t' -c 'interface lo' -c 'no ipv6 ospf6 passive' -c 'end' -c 'wr'
-      $( [[ ${ENABLE_TELEGRAM:-0} -eq 1 ]] and 'echo "Servidor $HOSTNAME morreu!" | /usr/local/sbin/telegram-notify --error --text -' or 'true' )
+      if [[ \$ENABLE_TELEGRAM -eq 1 ]]; then
+         echo "Servidor \$HOSTNAME morreu!" | /usr/local/sbin/telegram-notify --error --text -
+      fi
    fi
 }
 
@@ -613,20 +617,26 @@ adiciona_ospf() {
       vtysh -c 'conf t' -c 'interface lo' -c 'ip ospf passive' -c 'end' -c 'wr'
       vtysh -c 'conf t' -c 'interface lo' -c 'ipv6 ospf6 area 0.0.0.0' -c 'end' -c 'wr'
       vtysh -c 'conf t' -c 'interface lo' -c 'ipv6 ospf6 passive' -c 'end' -c 'wr'
-      $( [[ ${ENABLE_TELEGRAM:-0} -eq 1 ]] and 'echo "Servidor $HOSTNAME retornou do inferno!" | /usr/local/sbin/telegram-notify --success --text -' or 'true' )
+      if [[ \$ENABLE_TELEGRAM -eq 1 ]]; then
+         echo "Servidor \$HOSTNAME retornou do inferno!" | /usr/local/sbin/telegram-notify --success --text -
+      fi
    fi
 }
 
 systemctl status unbound &> /dev/null
 if [ \$? -ne 0 ]; then
-   $( [[ ${ENABLE_TELEGRAM:-0} -eq 1 ]] and 'echo "Servidor $HOSTNAME morreu DNS mas tentando levantar!" | /usr/local/sbin/telegram-notify --error --text -' or 'true' )
+   if [[ \$ENABLE_TELEGRAM -eq 1 ]]; then
+      echo "Servidor \$HOSTNAME morreu DNS mas tentando levantar!" | /usr/local/sbin/telegram-notify --error --text -
+   fi
    systemctl restart unbound
    systemctl status unbound &> /dev/null
    if [ \$? -ne 0 ]; then
       remove_ospf
       exit
    fi
-   $( [[ ${ENABLE_TELEGRAM:-0} -eq 1 ]] and 'echo "Servidor $HOSTNAME servico DNS voltou mas tinha morrido!" | /usr/local/sbin/telegram-notify --success --text -' or 'true' )
+   if [[ \$ENABLE_TELEGRAM -eq 1 ]]; then
+      echo "Servidor \$HOSTNAME servico DNS voltou mas tinha morrido!" | /usr/local/sbin/telegram-notify --success --text -
+   fi
 fi
 
 qt_falhas=0
