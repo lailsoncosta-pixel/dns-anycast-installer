@@ -111,7 +111,7 @@ collect_params() {
 # ---------- Funções de Escrita de Arquivos ----------
 
 apply_configs() {
-  # Extraindo apenas os IPs puros (sem a barra do CIDR)
+  # Extraindo variáveis dinâmicas
   IPV4_IP=$(echo "$IPV4_CIDR" | cut -d/ -f1)
   IPV6_IP=$(echo "$IPV6_PUB" | cut -d/ -f1)
   THREADS=$(nproc)
@@ -121,15 +121,19 @@ apply_configs() {
 # Gerado por $NAME | $PHONE
 auto lo
 iface lo inet loopback
+
 auto lo:0
 iface lo:0 inet static
       address $L1V4/32
+
 auto lo:1
 iface lo:1 inet static
       address $L2V4/32
+
 auto lo:2
 iface lo:2 inet6 static
       address $L1V6/128
+
 auto lo:3
 iface lo:3 inet6 static
       address $L2V6/128
@@ -138,6 +142,7 @@ auto $WAN_IF
 iface $WAN_IF inet static
       address $IPV4_CIDR
       gateway $IPV4_GW
+
 iface $WAN_IF inet6 static
       pre-up modprobe ipv6
       address $IPV6_PUB
@@ -147,8 +152,12 @@ EOF
   # 2. FRR Template
   sed -i 's/ospfd=no/ospfd=yes/' /etc/frr/daemons
   sed -i 's/ospf6d=no/ospf6d=yes/' /etc/frr/daemons
+  
+  # Captura a versão exata do FRR instalado no Debian
+  FRR_VER=$(dpkg -l | grep -w frr | awk '{print $3}' | cut -d'-' -f1)
+
   cat > /etc/frr/frr.conf <<EOF
-frr version 10.3
+frr version $FRR_VER
 frr defaults traditional
 hostname $HOSTNAME_NEW
 service integrated-vtysh-config
@@ -172,6 +181,10 @@ router ospf6
  ospf6 router-id $IPV4_IP
  redistribute connected
 EOF
+
+  # Permissões corretas para o FRR conseguir ler o arquivo
+  chown frr:frr /etc/frr/frr.conf /etc/frr/daemons
+  chmod 640 /etc/frr/frr.conf
 
   # 3. Unbound Hyperlocal
   mkdir -p /etc/unbound/unbound.conf.d
@@ -279,8 +292,12 @@ auth-zone:
     zonefile: "/var/lib/unbound/arpa.zone"
 EOF
 
-  # 4. Ajustar permissões e reiniciar serviços
+  # 4. Ajustar permissões da pasta de Log (Corrigido)
+  mkdir -p /var/log/unbound
+  touch /var/log/unbound/unbound.log
   chown -R unbound:unbound /etc/unbound /var/log/unbound
+
+  # 5. Reiniciar serviços
   systemctl restart networking || true
   systemctl restart frr || true
   systemctl restart unbound || true
